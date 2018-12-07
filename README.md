@@ -1,7 +1,7 @@
 # PriCoSha_Project
 
-Python Flask
-MySQL
+* Python Flask
+* MySQL
 
 Team Member
 ------------------------------------------------
