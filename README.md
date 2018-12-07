@@ -16,3 +16,4 @@ Feature
 * Post a content
 * Tag a content item
 * Add friend
+* Register
