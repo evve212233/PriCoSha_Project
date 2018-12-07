@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PriCoSha | Group Management</title>
+    <link href="/static/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/main.css">
+</head>
+
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark static-top">
+        <div class="container">
+            <a class="navbar-brand" href="#">PriCoSha</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarResponsive"
+                aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarResponsive">
+                <ul class="navbar-nav ml-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{url_for('index')}}">home</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{url_for('post')}}">post</a>
+                    </li>
+		            <li class="nav-item">
+                        <a class="nav-link active" href="{{url_for('GroupManagement')}}">your groups</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{url_for('logout')}}">logout</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <center>
+    {% if errors %}
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        {{ errors }}
+        <button type="button" class="close" aria-label="Close" onclick="hideAlert()">
+            <span aria-hidden="true">&times;</span>
+        </button>
+    </div>
+    {% endif %}
+    <div id="form-div">
+        <h6>Create New Group:</h6>
+        <div class="input-group form-group">
+            <div class="input-group-prepend">
+                <span class="input-group-text" id="">Name</span>
+            </div>
+            <input type="text" class="form-control" id= "groupname" name="groupname" placeholder="Group Name" autocomplete="off">
+        </div>
+        <div class="form-group">
+            <input type="text" class="form-control" id="description" name="description" placeholder="Description" autocomplete="off">
+        </div>
+        <button onclick="createGroup()" class="btn btn-primary" style="width:100%">Create</button>
+        </form>
+    </div>
+    <br>
+    Your Groups:<br>
+    <ul class="list-group" style="width:50%;min-width: 300px" id="groups"></ul>
+    </center>
+
+    <div id="friendAdd" class="modal hide fade" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 id="myModalLabel">Please fill out the info</h4>
+                    <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
+                </div>
+                <div class="modal-body">
+                    <form id="groupForm" autocomplete="off">
+                        <p>Who do you want to add/delete for group:</p>
+                        <div class="modal-body">
+                            <input style="margin-top:2px;" class="form-control" type="text" id="fName" name="firstName" placeholder="FistName" required/>
+                            <input style="margin-top:2px;" class="form-control" type="text" id="lName" name="lastName" placeholder="LastName" required/>
+                        </div>
+                    </form>
+                    <button class="btn btn-outline-dark mb-2" style="width:49%" onclick="addFriend()">Add</button>
+                    <button class="btn btn-outline-dark mb-2" style="width:49%" onclick="deFriend()">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script src="{{url_for('static', filename='vendor/jquery/jquery.min.js')}}"></script>
+    <script src="{{url_for('static', filename='vendor/bootstrap/js/bootstrap.bundle.min.js')}}"></script>
+    <script src="{{url_for('static',filename='vendor/bootstrap/js/bootstrap-filestyle.min.js')}}"> </script>
+
+    <script>
+
+        function createGroup(){
+            var groupname = $('#groupname').val();
+            var description = $('#description').val();
+            $.ajax({
+                type: "POST",
+                url: "/groups/create",
+                data: {
+                    "groupname": groupname,
+                    "description": description,
+                },
+                success: function(info){
+                    if(info.fg_name && info.owner){
+                        updateGroupUI(info.fg_name,info.description,info.owner,info.owner);
+                    }else{
+                        alert('You cannot own two groups with the same name');
+                    }
+                },
+                error: function(err){
+                    alert("err");
+                }
+            });
+        }
+
+        function generateSpan(fg_name,description,owner,user){
+            <!--print("generating span");-->
+            if(owner == user) {
+                var span = '<span class="list-group-item list-group-item-action disabled">' + fg_name + '; description: '
+                    + description + '; owner: ' + owner +
+                    '<button data-email="' + owner + '" data-fgName="'+fg_name+'" role="button" class="btn btn-outline-dark mb-2" onclick="addGroup(this)">Add/De friend</button>' +
+                    '</span>'
+            }
+            else {
+                var span = '<span class="list-group-item list-group-item-action disabled">' + fg_name + '; description: '
+                    + description + '; owner: ' + owner + '</span>';
+            }
+            return span;
+        };
+
+        var selected_fg = ''
+        function addGroup(elem){
+            var fg_name = $(elem).attr('data-fgName');
+            selected_fg = fg_name;
+            $("#friendAdd").modal('show');
+        }
+
+        function deFriend(){
+            var fname = $("#fName").val();
+            var lname = $('#lName').val();
+            $.ajax({
+                type: "DELETE",
+                url: "/groups/defriend",
+                data:{
+                    "firstName": fname,
+                    "lastName": lname,
+                    "fg_name": selected_fg,
+                },
+                success: function(info){
+                    if(info.noUser){
+                        alert(info.noUser);
+                    }
+                    if(info.notIn){
+                        alert(info.notIn);
+                    }
+                    if(info.deleted){
+                        alert(info.deleted);
+                    }
+                    if(info.suicide){
+                        alert(info.suicide);
+                    }
+                    if(info.dup){
+                        var dupArray = [];
+                        for(var i = 0; i < info.dup.length; i++){
+                            var data = info.dup[i];
+                            var temp = [data[0],data[1],data[2]];
+                            dupArray.push(temp);
+                        }
+                        alert(dupArray);
+                    }
+                }
+            })
+        }
+
+        function addFriend(){
+            var fname = $("#fName").val();
+            var lname = $('#lName').val();
+            $.ajax({
+                type: "POST",
+                url: "/groups/friendAdd",
+                data:{
+                    "firstName": fname,
+                    "lastName": lname,
+                    "fg_name": selected_fg,
+                },
+                success: function(info){
+                    if(info.noUser){
+                        alert(info.noUser);
+                    }
+                    if(info.alreadyIn){
+                        alert(info.alreadyIn);
+                    }
+                    if(info.added){
+                        alert(info.added);
+                    }
+                    if(info.dup){
+                        var dupArray = [];
+                        for(var i = 0; i < info.dup.length; i++){
+                            var data = info.dup[i];
+                            var temp = [data[0],data[1],data[2]];
+                            dupArray.push(temp);
+                        }
+                        alert(dupArray);
+                    }
+                },
+                error: function(err){
+                    alert("Error")
+                }
+            })
+        };
+        /*
+        function addFriendWithEmail(){
+            var fname = $("#fName").val();
+            var lname = $('#lName').val();
+            var email = $("#email").val();
+            $.ajax({
+                type: "POST"
+                url:"/groups/friendAddWithEmail",
+                data:{
+                    "firstName": fname,
+                    "lastName": lname,
+                    "email":email,
+                    "fg_name": selected_fg
+                },
+                success: function(info) {
+                }
+            })
+        }*/
+
+        $.ajax({
+            type: "GET",
+            url: "/groups/fetch",
+            success: function(groups){
+                if(groups.data && groups.user){
+                    for(var i = 0; i < groups.data.length; i++){
+                        updateGroupUI(groups.data[i][0],groups.data[i][1],groups.data[i][2], groups.user);
+                    }
+                }
+            },
+            error: function(err){
+                alert("err");
+            }
+        }); //show all groups>
+        function updateGroupUI(fg_name,description, owner, user){
+            var span = generateSpan(fg_name,description,owner, user);
+            $("#groups").append(span);
+        }
+        function hideAlert(){
+            $(".alert").hide();
+        }
+    </script>
+
+
+
+</body>
+
+</html>
