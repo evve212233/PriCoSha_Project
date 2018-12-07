@@ -1,5 +1,5 @@
 # PriCoSha_Project
-------------------------------------------------
+
 Python Flask
 MySQL
 
