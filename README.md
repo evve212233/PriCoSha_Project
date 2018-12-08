@@ -1,7 +1,7 @@
 # PriCoSha_Project
 
 PriCoSha a system for privately sharing content items
-among groups of people that i made for the Databases Project.
+among groups of people that i made for the Databases Project. For this project,
 I used
 * Python Flask
 * MySQL
