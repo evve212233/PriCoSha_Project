@@ -14,11 +14,11 @@ Team Member
 
 Feature
 ------------------------------------------------
-[x] View Public Content
-[x] Login
-[ ] View shared content items and info about them
-[ ] Manage tags
-[ ] Post a content
-[ ] Tag a content item
-[ ] Add friend
-[x] Register
+- [x] View Public Content
+- [x] Login
+- [ ] View shared content items and info about them
+- [ ] Manage tags
+- [ ] Post a content
+- [ ] Tag a content item
+- [ ] Add friend
+- [x] Register
