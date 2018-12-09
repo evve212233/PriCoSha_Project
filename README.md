@@ -19,6 +19,6 @@ Feature
 - [x] View shared content items and info about them
 - [x] Manage tags
 - [x] Post a content
-- [ ] Tag a content item
+- [x] Tag a content item
 - [ ] Add friend
 - [x] Register
