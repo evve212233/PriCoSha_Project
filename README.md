@@ -18,7 +18,7 @@ Feature
 - [x] Login
 - [x] View shared content items and info about them
 - [ ] Manage tags
-- [ ] Post a content
+- [x] Post a content
 - [ ] Tag a content item
 - [ ] Add friend
 - [x] Register
