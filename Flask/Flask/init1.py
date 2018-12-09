@@ -15,14 +15,6 @@ conn = pymysql.connect(host='localhost',
                        charset='utf8mb4',
                        cursorclass=pymysql.cursors.DictCursor)
 
-def getGroups(email):
-    cursor = conn.cursor()
-    query = "SELECT owner_email, fg_name FROM belong where email=(%s)"
-    cursor.execute(query,email)
-    groups = cursor.fetchall()
-    cursor.close()
-    return groups
-
 #Login/Register - Show public posts that are posted within 24 hours
 @app.route('/')
 def hello():
@@ -33,6 +25,48 @@ def hello():
     data = cursor.fetchall()
     cursor.close()
     return render_template('index.html', public=data)
+
+
+# Display shared posts and public posts
+@app.route('/home')
+def home():
+    user = session['email']
+    cursor = conn.cursor();
+    # Find the posts that are shared with user
+    query = 'SELECT * FROM contentitem NATURAL JOIN (SELECT item_id FROM share NATURAL JOIN belong WHERE email = %s)'
+    query += ' AS T WHERE item_id=T.item_id ORDER BY post_time DESC'
+    cursor.execute(query, user)
+    data = cursor.fetchall()
+
+    infoString = []
+    for entry in data:
+        append = {"post": entry}
+
+        query = 'SELECT fname, lname FROM person NATURAL JOIN (SELECT email_tagged AS email FROM tag WHERE item_id=%s AND status) AS T'
+        cursor.execute(query, entry['item_id'])
+        taggees = cursor.fetchall()
+        tagStr = "TAGGEE(s): |"
+        if (taggees):
+            for person in taggees:
+                tagStr += (person['fname'] + " " + person['lname'] + "|")
+        else:
+            tagStr += "None|"
+        append["taggee"] = tagStr
+
+        query = "SELECT emoji FROM rate WHERE item_id=%s"
+        cursor.execute(query, entry['item_id'])
+        emojis = cursor.fetchall()
+        emojiStr = "RATING(s): |"
+        if (emojis):
+            for emoji in emojis:
+                emojiStr += (emoji['emoji'] + "|")
+        else:
+            emojiStr += "None|"
+        append["emoji"] = emojiStr
+        infoString.append(append)
+
+    cursor.close()
+    return render_template('home.html', name=session['fname'], info=infoString, public=data)
 
 #Define route for register
 @app.route('/register')
@@ -72,8 +106,6 @@ def registerUser():
             msg = "User Already Exist"
             return redirect(url_for('registerAuth',error=msg))
 
-def encrypt(hash_str):
-    return hashlib.sha256(hash_str.encode()).hexdigest()
 
 @app.route('/login')
 def login():
@@ -134,174 +166,132 @@ def registerAuth():
         return render_template('index.html')
 
 
-#Display shared posts and public posts
-@app.route('/home')     
-def home():
-    user = session['email']
-
-    cursor = conn.cursor();
-    # Find the posts that are shared with user
-    query = 'SELECT * FROM contentitem NATURAL JOIN (SELECT item_id FROM share NATURAL JOIN belong WHERE email = %s)' 
-    query += ' AS T WHERE item_id=T.item_id ORDER BY post_time DESC'
-    cursor.execute(query, user)
-    data = cursor.fetchall()
-
-    
-    infoString = []
-    for entry in data:
-        append = {"post":entry}
-        
-        query = 'SELECT fname, lname FROM person NATURAL JOIN (SELECT email_tagged AS email FROM tag WHERE item_id=%s AND status) AS T'
-        cursor.execute(query, entry['item_id'])
-        taggees = cursor.fetchall()
-        tagStr = "TAGGEE(s): |"
-        if (taggees):
-            for person in taggees:
-                tagStr += (person['fname']+ " "+ person['lname']+ "|")
-        else:
-            tagStr += "None|"
-        append["taggee"]=tagStr
-        
-        query = "SELECT emoji FROM rate WHERE item_id=%s"
-        cursor.execute(query, entry['item_id'])
-        emojis = cursor.fetchall()
-        emojiStr = "RATING(s): |"
-        if (emojis):
-            for emoji in emojis:
-                emojiStr += (emoji['emoji'] + "|")
-        else:
-            emojiStr += "None|"
-        append["emoji"]=emojiStr
-        infoString.append(append)
-        
-    cursor.close()
-    return render_template('home.html', name=session['fname'], info=infoString, public=data)
 
 @app.route('/post', methods=['GET', 'POST'])
 def post():
     email = session['email']
     cursor = conn.cursor();
-    blog = request.form['blog']
-    query = 'INSERT INTO blog (email, blog_content) VALUES (%s, %s)'
-    cursor.execute(query, (email, blog))
-    conn.commit()
-    cursor.close()
-    return render_template('my_posts.html')
-
+    item_name = request.form['item_name']
+    pub = request.form['public']
+    if pub == 'public':
+        query2 = 'INSERT INTO contentitem (email_post,item_name, is_pub) VALUES (%s,%s,1)'
+        cursor.execute(query2,(email, item_name))
+        conn.commit()
+        cursor.close()
+    else:
+        query3 = 'INSERT INTO contentitem (email_post,item_name, is_pub) VALUES (%s,%s,0)'
+        cursor.execute(query3,(email, item_name))
+        conn.commit()
+        cursor.close()
+    return redirect(url_for('my_posts'))
+#-----------------------------DONE----------------------------------------------------------------------------#
 @app.route('/my_posts', methods=["GET", "POST"])
 def my_posts():
-    return render_template('my_posts.html')
+    email = session['email']
+    cursor = conn.cursor();
+    query = 'SELECT item_id, item_name, post_time FROM contentitem WHERE email_post = %s ORDER BY item_id DESC'
+    cursor.execute(query, (email))
+    data = cursor.fetchall()
+    cursor.close()
+    return render_template('my_posts.html', name=session['fname'], posts=data)
+
+@app.route('/share_group', methods=["GET", "POST"])
+def share_group():
+    email = session['email']
+    cursor = conn.cursor();
+    query = 'SELECT item_id, item_name, post_time FROM contentitem WHERE email_post = %s ORDER BY item_id DESC'
+    cursor.execute(query, (email))
+    post_data = cursor.fetchall()
+    query = 'SELECT fg_name, item_id FROM share WHERE owner_email = %s ORDER BY item_id DESC'
+    cursor.execute(query, (email))
+    share_data = cursor.fetchall()
+    cursor.close()
+    return render_template('share_group.html', name=session['fname'], posts=post_data, shares=share_data)
+
+@app.route('/share_to_grp', methods=["GET", "POST"])
+def share_to_grp():
+    email = session['email']
+    cursor = conn.cursor();
+    share_grp = request.form['group_name']
+    item_id = request.form['item_id']
+    error = None
+    query1 = 'SELECT fg_name FROM friendgroup WHERE owner_email=%s'
+    cursor.execute(query1, (email))
+    fg_lst = cursor.fetchall()
+    if share_grp not in fg_lst:
+        error = 'Group does not exist'
+        return render_template('share_group.html', name=session['fname'], email=email, error=error)
+    try:
+        query = 'INSERT INTO share VALUES (%s, %s, %s)'
+        cursor.execute(query, (email, share_grp, item_id))
+        conn.commit()
+        cursor.close()
+        return redirect(url_for('share_group'))
+    except:
+        # returns an error message to the html page
+        error = 'Invalid Share (Already exist Or No item id found)'
+        return render_template('share_group.html', name=session['fname'], email=email, error=error)
 
 @app.route("/addFriend", methods=['GET','POST'])
 def addFriend():
-    cursor = conn.cursor()
-    fName = request.form['fname']
-    lName = request.form['lname']
-    fg_name = request.form['fg_name']
-    try:
-        sqlCount = "select count(distinct email) from person where fname = (%s) and lname = (%s)"
-        cursor.execute(sqlCount, (fName,lName))
-        count = cursor.fetchone()
-        count = count[0] # reformat count
-        sqlEmail = "select email from person where fname = (%s) and lname = (%s)"
-        cursor.execute(sqlEmail, (fName, lName))
-        friendID = cursor.fetchall()
-    finally:
-        if count == 0:
-            error = "there is no such a user with name " + fName + " " + lName
-            cursor.close()
-            return render_template('friend_groups.html', error=error)
-
-        sqlAlreadyIn = "select fname, lname, email from belong Natural join person where fname=(%s) and lname=(%s) and owner_email=(%s) and fg_name=(%s)"
-        cursor.execute(sqlAlreadyIn,(fName,lName, session['email'], fg_name))
-        alreadyIn = cursor.fetchall()
-
-        if count == 1:
-            if alreadyIn:
-                error = "user " + fName + " " + lName +" is already in this group"
-                cursor.close()
-                return render_template('friend_groups.html',error=error)
-            else:
-                print("not in")
-                friendID = friendID[0]
-                sqlInsert = "insert into belong (email, owner_email, fg_name) values (%s, %s, %s)"
-                cursor.execute(sqlInsert, (friendID, session['email'], fg_name))
-                conn.commit()
-                cursor.close()
-                msg ="Congratulation! user " + fName + " " + lName +" SUCCESSFULLY added!"
-                return redirect(url_for('home'))
-        else:
-            return render_template('friend_groups.html')
+    return
 
 
 @app.route("/groups/create",methods=['GET','POST'])
 def createGroup():
-    cursor = conn.cursor()
-    fg_name = request.form['groupname']
-    description = request.form['description']
-    result = None
-    try:
-        sql = "select * from friendgroup where owner_email = (%s) and fg_name = (%s)"
-        cursor.execute(sql, (session['user'],fg_name))
-        result = cursor.fetchone()
-    finally:
-        if not result:
-            sql = "insert into friendgroup(owner_email, fg_name, description) Values (%s,%s,%s)"
-            cursor.execute(sql, (session['user'], fg_name, description))
-            sql = "insert into belong(email, owner_email, fg_name) Values (%s,%s,%s)"
-            cursor.execute(sql, (session['user'], session['user'], fg_name))
-            conn.commit()
-            cursor.close()
-            return jsonify({'fg_name': fg_name, 'owner':session['user'], 'description': description})
-        else:
-            msg = "Group Already Exist"
-            return redirect(url_for('GroupManagement', error=msg))
-    # Return statement is for updating UI using AJAX
-    return jsonify({'name':fg_name, 'description':description})
-            #return redirect(url_for('GroupManagement',error=msg))
-
+    return
 @app.route('/friend_groups', methods=["GET", "POST"])
 def friend_groups():
     return render_template('friend_groups.html')
 
 @app.route('/tag_request', methods=["GET", "POST"])
 def tag_request():
-    name=session['fname']+''+session['lname']
     email=session['email']
     cursor=conn.cursor()
     query='SELECT * FROM Tag NATURAL JOIN contentitem WHERE Tag.email_tagged = %s AND (status IS NULL or status= false)'
     cursor.execute(query,(email))
+    conn.commit()
     data=cursor.fetchall()
     cursor.close()
     return render_template('tag_request.html',pending_request=data)
 
 @app.route('/accept_tag', methods=['GET','POST'])
 def accept_tag():
-    item_id = request.form['item_id']
-    name=session['fname']+' '+session['lname']
-    taggee=request.form['taggee']
-    tagger=request.form['tagger']
-    item_id=request.form[item_id]
-    cursor=conn.cursor()
-    query='UPDATE Tag SET status=True WHERE email_tagged=%s AND email_tagger=%s AND item_id=%s)'
-    cursor.execute(query,(taggee,tagger,item_id))
-    data=cursor.fetchall()
-    cursor.close()
-    return render_template(url_for('tag_request'))
+     item_id = request.form['item_id']
+     email = session['email']
+     tagger=request.form['tagger']
+     cursor=conn.cursor()
+     query='UPDATE Tag SET status=True WHERE email_tagged=%s AND email_tagger=%s AND item_id=%s'
+     cursor.execute(query,(email,tagger,item_id))
+     conn.commit()
+     data=cursor.fetchall()
+     cursor.close()
+     return redirect(url_for('tag_request'))
 
-@app.route('/accept_tag', methods=['GET','POST'])
+@app.route('/decline_tag', methods=['GET','POST'])
 def decline_tag():
     item_id = request.form['item_id']
-    name=session['fname']+' '+session['lname']
-    taggee=request.form['taggee']
-    tagger=request.form['tagger']
-    item_id=request.form[item_id]
-    cursor=conn.cursor()
-    query='DELETE FROM Tag WHERE email_tagged=%s AND email_tagger=%s AND item_id=%s)'
-    cursor.execute(query,(taggee,tagger,item_id))
+    email = session['email']
+    tagger = request.form['tagger']
+    cursor = conn.cursor()
+    query = 'DELETE FROM Tag WHERE email_tagged=%s AND email_tagger=%s AND item_id=%s'
+    cursor.execute(query, (email, tagger, item_id))
+    conn.commit()
     cursor.close()
-    return render_template(url_for('tag_request'))
+    return redirect(url_for('tag_request'))
 
+
+@app.route('/select_blogger')
+def select_blogger():
+    # check that user is logged in
+    user = session['email']
+    # should throw exception if username not found
+    cursor = conn.cursor();
+    query = 'SELECT DISTINCT username FROM blog'
+    cursor.execute(query)
+    data = cursor.fetchall()
+    cursor.close()
+    return render_template('select_blogger.html', user_list=data)
 
 @app.route('/logout')
 def logout():
