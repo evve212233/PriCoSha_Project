@@ -20,5 +20,5 @@ Feature
 - [x] Manage tags
 - [x] Post a content
 - [x] Tag a content item
-- [ ] Add friend
+- [x] Add friend
 - [x] Register
