@@ -17,7 +17,7 @@ Feature
 - [x] View Public Content
 - [x] Login
 - [x] View shared content items and info about them
-- [ ] Manage tags
+- [x] Manage tags
 - [x] Post a content
 - [ ] Tag a content item
 - [ ] Add friend
