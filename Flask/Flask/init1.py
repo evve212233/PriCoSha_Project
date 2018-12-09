@@ -9,11 +9,11 @@ app = Flask(__name__)
 #Configure MySQL
 conn = pymysql.connect(host='localhost',
                        port = 3306,
-                       user='root',
-                       password=None,
-                       db='pricosha',
-                       charset='utf8mb4',
-                       cursorclass=pymysql.cursors.DictCursor)
+                       user ='root',
+                       password = None,
+                       db ='pricosha',
+                       charset ='utf8mb4',
+                       cursorclass = pymysql.cursors.DictCursor)
 
 #Login/Register - Show public posts that are posted within 24 hours
 @app.route('/')
