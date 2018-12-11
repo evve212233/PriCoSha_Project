@@ -9,11 +9,11 @@ app = Flask(__name__)
 #Configure MySQL
 conn = pymysql.connect(host='localhost',
                        port = 3306,
-                       user ='root',
-                       password = None,
-                       db ='pricosha',
-                       charset ='utf8mb4',
-                       cursorclass = pymysql.cursors.DictCursor)
+                       user='root',
+                       password=None,
+                       db='pricosha',
+                       charset='utf8mb4',
+                       cursorclass=pymysql.cursors.DictCursor)
 
 #Login/Register - Show public posts that are posted within 24 hours
 @app.route('/')
@@ -228,9 +228,9 @@ def share_to_grp():
     query1 = 'SELECT fg_name FROM friendgroup WHERE owner_email=%s'
     cursor.execute(query1, (email))
     fg_lst = cursor.fetchall()
-    if share_grp not in fg_lst:
-        error = 'Group does not exist'
-        return render_template('share_group.html', name=session['fname'], posts=post_data, shares=share_data, email=email, error=error)
+    #if share_grp not in fg_lst:
+    #    error = 'Group does not exist'
+    #    return render_template('share_group.html', name=session['fname'], posts=post_data, shares=share_data, email=email, error=error)
     try:
         query = 'INSERT INTO share VALUES (%s, %s, %s)'
         cursor.execute(query, (email, share_grp, item_id))
@@ -250,8 +250,12 @@ def tag_request():
     cursor.execute(query,(email))
     conn.commit()
     data=cursor.fetchall()
+    query2='SELECT * FROM Tag NATURAL JOIN contentitem WHERE Tag.email_tagged = %s AND (status=true or status=false)'
+    cursor.execute(query2,(email))
+    conn.commit()
+    data2=cursor.fetchall()
     cursor.close()
-    return render_template('tag_request.html',pending_request=data)
+    return render_template('tag_request.html',name=session['fname'],pending_request=data, show_tag=data2)
 
 @app.route('/accept_tag', methods=['GET','POST'])
 def accept_tag():
@@ -285,6 +289,12 @@ def tag_other():
     email = session['email']
     # should throw exception if username not found
     cursor = conn.cursor();
+
+    query3 = 'SELECT * FROM contentitem NATURAL JOIN (SELECT item_id FROM share NATURAL JOIN belong WHERE email = %s)'
+    query3 += ' AS T WHERE item_id=T.item_id ORDER BY post_time DESC'
+    cursor.execute(query3, email)
+    share = cursor.fetchall()
+
     query1 = 'SELECT * FROM contentitem WHERE is_pub'
     cursor.execute(query1)
     data = cursor.fetchall()
@@ -292,7 +302,7 @@ def tag_other():
     cursor.execute(query2,(email))
     data2 = cursor.fetchall()
     cursor.close()
-    return render_template('tag_other.html', name=session['fname'], public=data, tags=data2)
+    return render_template('tag_other.html', name=session['fname'], public=data, info=share, tags=data2)
 
 
 @app.route('/tagee', methods=['GET','POST'])
@@ -302,16 +312,32 @@ def tagee():
 
     query1 = 'SELECT * FROM contentitem WHERE is_pub'
     cursor.execute(query1)
-    data = cursor.fetchall()
+    data1 = cursor.fetchall()
     query2 = 'SELECT * FROM tag WHERE email_tagger = %s'
     cursor.execute(query2,(email))
     data2 = cursor.fetchall()
 
+    query5 = 'SELECT * FROM contentitem NATURAL JOIN (SELECT item_id FROM share NATURAL JOIN belong WHERE email = %s)'
+    query5 += ' AS T WHERE item_id=T.item_id ORDER BY post_time DESC'
+    cursor.execute(query5, email)
+    share = cursor.fetchall()
+
+    query4 = 'SELECT item_id, email_post FROM contentitem WHERE is_pub'
+    cursor.execute(query4)
+    data3 = cursor.fetchall()
+    query3 = 'SELECT item_id, email_post FROM contentitem NATURAL JOIN (SELECT item_id FROM share NATURAL JOIN belong WHERE email = %s)'
+    query3 += ' AS T WHERE item_id=T.item_id ORDER BY post_time DESC'
+    cursor.execute(query3,(email))
+    data4 = cursor.fetchall()
+
+    email_lst = data3+data4
     taggee = request.form['email_tagged']
     item_id = request.form['item_id']
-    query1 = 'SELECT item_id, email_post FROM contentitem WHERE is_pub=1'
-    cursor.execute(query1)
-    data = cursor.fetchall()
+    check_email_id = {'item_id': int(item_id), 'email_post': taggee}
+    if check_email_id not in email_lst:
+        error = 'You cannot propose this tag'
+        return render_template('tag_other.html', name=session['fname'], public=data1, info=share, tags=data2, error=error)
+
     try:
         query = 'INSERT INTO tag (email_tagged, email_tagger, item_id) VALUES (%s, %s, %s)'
         cursor.execute(query, (taggee, email, item_id))
@@ -320,7 +346,7 @@ def tagee():
         return redirect(url_for('tag_other'))
     except:
         error = 'Invalid tag'
-        return render_template('tag_other.html', name=session['fname'], public=data, tags=data2, error=error)
+        return render_template('tag_other.html', name=session['fname'], public=data1, tags=data2, info=share, error=error)
 
 @app.route('/logout')
 def logout():
