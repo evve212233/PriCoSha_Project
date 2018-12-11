@@ -373,10 +373,14 @@ def addFriend():
     email_lst = cursor.fetchall()
     num_email = len(email_lst)
 
+    query2 = 'SELECT fg_name, description FROM belong NATURAL JOIN friendgroup WHERE email=%s'
+    cursor.execute(query2, (owner_email))
+    belong_data = cursor.fetchall()
+
     if num_email==0:
         error = 'Person does not exist'
         cursor.close()
-        return render_template('friend_groups.html', name=session['fname'], public=pub_fg, error=error)
+        return render_template('friend_groups.html', name=session['fname'], public=pub_fg, belong=belong_data, error=error)
     try:
         if num_email==1:
             query2='INSERT INTO belong VALUES (%s, %s, %s)'
@@ -388,7 +392,7 @@ def addFriend():
             return redirect(url_for('multi_friends'))
     except:
         error = 'Invalid tag'
-        return render_template('friend_groups.html', name=session['fname'], public=pub_fg, error=error)
+        return render_template('friend_groups.html', name=session['fname'], public=pub_fg, belong=belong_data, error=error)
 
 @app.route('/multi_friends', methods=["GET", "POST"])
 def multi_friends():
@@ -424,8 +428,13 @@ def friend_groups():
     cursor.execute(query1,(email))
     conn.commit()
     data = cursor.fetchall()
+
+    query2 = 'SELECT fg_name, description FROM belong NATURAL JOIN friendgroup WHERE email=%s'
+    cursor.execute(query2, (email))
+    belong_data = cursor.fetchall()
+
     cursor.close()
-    return render_template('friend_groups.html', name=session['fname'], public=data)
+    return render_template('friend_groups.html', name=session['fname'], belong=belong_data, public=data)
 
 
 app.secret_key = 'some key that you will never guess'
